@@ -85,26 +85,42 @@ export function AdminPage() {
       photos: gymForm.photos || [],
       verified: gymForm.verified || false,
     };
-    if (editingGym) {
-      await supabase.from('gyms').update(payload).eq('id', editingGym.id);
-    } else {
-      await supabase.from('gyms').insert(payload);
+    try {
+      if (editingGym) {
+        const { error } = await supabase.from('gyms').update(payload).eq('id', editingGym.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('gyms').insert(payload);
+        if (error) throw error;
+      }
+      setGymModal(false);
+      setGymForm({});
+      setEditingGym(null);
+      loadAll();
+    } catch {
+      alert('Erro ao salvar academia. Tente novamente.');
     }
-    setGymModal(false);
-    setGymForm({});
-    setEditingGym(null);
-    loadAll();
   }
 
   async function deleteGym(id: string) {
     if (!confirm('Excluir esta academia?')) return;
-    await supabase.from('gyms').delete().eq('id', id);
-    loadAll();
+    try {
+      const { error } = await supabase.from('gyms').delete().eq('id', id);
+      if (error) throw error;
+      loadAll();
+    } catch {
+      alert('Erro ao excluir academia');
+    }
   }
 
   async function toggleVerified(gym: Gym) {
-    await supabase.from('gyms').update({ verified: !gym.verified }).eq('id', gym.id);
-    loadAll();
+    try {
+      const { error } = await supabase.from('gyms').update({ verified: !gym.verified }).eq('id', gym.id);
+      if (error) throw error;
+      loadAll();
+    } catch {
+      alert('Erro ao atualizar verificação');
+    }
   }
 
   function openGymEdit(gym: Gym) {

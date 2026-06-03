@@ -71,7 +71,21 @@ export function SettingsPage() {
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    const ext = file.name.split('.').pop();
+
+    // Validar tipo de arquivo
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Apenas imagens (JPG, PNG, WebP, GIF) são permitidas.');
+      return;
+    }
+
+    // Validar tamanho (máx 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Imagem muito grande (máx 5MB).');
+      return;
+    }
+
+    const ext = file.type.split('/')[1];
     const path = `avatars/${user.id}.${ext}`;
     const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
     if (uploadErr) { setError('Erro ao fazer upload da foto.'); return; }
@@ -106,8 +120,8 @@ export function SettingsPage() {
           <div className="flex items-center gap-5">
             <div className="relative">
               <div className="w-20 h-20 rounded-2xl bg-accent-blue/20 border-2 border-accent-blue/30 flex items-center justify-center overflow-hidden">
-                {user?.avatar_url ? (
-                  <img src={user.avatar_url} className="w-full h-full object-cover" alt="" />
+                {user?.avatar_url && user.avatar_url.startsWith('http') ? (
+                  <img src={user.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
                 ) : (
                   <span className="text-2xl font-bold text-accent-blue">{user?.full_name?.charAt(0)}</span>
                 )}

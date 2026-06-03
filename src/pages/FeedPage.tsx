@@ -64,26 +64,38 @@ export function FeedPage() {
 
   async function createPost() {
     if (!content.trim() || !user) return;
+    if (content.length > 1000) {
+      alert('Postagem muito longa (máximo 1000 caracteres)');
+      return;
+    }
     setPosting(true);
-    await supabase.from('posts').insert({ user_id: user.id, content: content.trim() });
-    setContent('');
+    const { error } = await supabase.from('posts').insert({ user_id: user.id, content: content.trim() });
     setPosting(false);
+    if (error) {
+      alert('Erro ao publicar. Tente novamente.');
+      return;
+    }
+    setContent('');
     loadPosts();
   }
 
   async function toggleLike(post: PostWithUser) {
     if (!user) return;
-    if (post.isLiked) {
-      await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
-      await supabase.from('posts').update({ likes_count: Math.max(0, post.likes_count - 1) }).eq('id', post.id);
-    } else {
-      await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id });
-      await supabase.from('posts').update({ likes_count: post.likes_count + 1 }).eq('id', post.id);
+    try {
+      if (post.isLiked) {
+        await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
+        await supabase.from('posts').update({ likes_count: Math.max(0, post.likes_count - 1) }).eq('id', post.id);
+      } else {
+        await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id });
+        await supabase.from('posts').update({ likes_count: post.likes_count + 1 }).eq('id', post.id);
+      }
+      setPosts(prev => prev.map(p => p.id === post.id
+        ? { ...p, isLiked: !p.isLiked, likes_count: p.isLiked ? p.likes_count - 1 : p.likes_count + 1 }
+        : p
+      ));
+    } catch {
+      alert('Erro ao atualizar like');
     }
-    setPosts(prev => prev.map(p => p.id === post.id
-      ? { ...p, isLiked: !p.isLiked, likes_count: p.isLiked ? p.likes_count - 1 : p.likes_count + 1 }
-      : p
-    ));
   }
 
   async function toggleComments(post: PostWithUser) {
@@ -101,7 +113,15 @@ export function FeedPage() {
   async function addComment(postId: string) {
     const text = commentInputs[postId]?.trim();
     if (!text || !user) return;
-    await supabase.from('post_comments').insert({ post_id: postId, user_id: user.id, content: text });
+    if (text.length > 500) {
+      alert('Comentário muito longo (máximo 500 caracteres)');
+      return;
+    }
+    const { error } = await supabase.from('post_comments').insert({ post_id: postId, user_id: user.id, content: text });
+    if (error) {
+      alert('Erro ao adicionar comentário');
+      return;
+    }
     setCommentInputs(prev => ({ ...prev, [postId]: '' }));
     // Reload comments for that post
     const { data } = await supabase.from('post_comments')

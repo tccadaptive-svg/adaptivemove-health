@@ -1,8 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
@@ -93,9 +93,8 @@ Deno.serve(async (req: Request) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Anthropic API error:", data);
       return new Response(
-        JSON.stringify({ response: "Erro ao processar sua mensagem. Tente novamente." }),
+        JSON.stringify({ response: "Erro ao processar sua mensagem." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -107,9 +106,8 @@ Deno.serve(async (req: Request) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error:", error);
     return new Response(
-      JSON.stringify({ response: "Erro interno. Tente novamente." }),
+      JSON.stringify({ response: "Erro interno ao processar sua mensagem." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -93,6 +93,6 @@ export function A11yProvider({ children }: { children: React.ReactNode }) {
 
 export function useA11y() {
   const ctx = useContext(A11yContext);
-  if (!ctx) throw new Error('useA11y must be used within A11yProvider');
+  if (!ctx) throw new Error('useA11y: contexto não encontrado. Verifique se o componente está dentro de <A11yProvider>.');
   return ctx;
 }

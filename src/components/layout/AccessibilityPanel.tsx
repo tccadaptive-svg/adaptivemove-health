@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { X, Type, Contrast, Zap, AlignJustify, Focus, Eye, MousePointer, Info } from 'lucide-react';
 import { useA11y } from '../../contexts/A11yContext';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 export function AccessibilityPanel() {
   const { settings, updateSetting, panelOpen, setPanelOpen } = useA11y();
-  const panelRef = useRef<HTMLDivElement>(null);
+  const focusTrapRef = useFocusTrap(panelOpen);
 
   useEffect(() => {
     if (!panelOpen) return;
@@ -12,8 +13,12 @@ export function AccessibilityPanel() {
       if (e.key === 'Escape') setPanelOpen(false);
     };
     document.addEventListener('keydown', handler);
-    panelRef.current?.focus();
-    return () => document.removeEventListener('keydown', handler);
+    // Prevent body scroll when panel is open
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handler);
+      document.body.style.overflow = '';
+    };
   }, [panelOpen, setPanelOpen]);
 
   if (!panelOpen) return null;
@@ -26,9 +31,10 @@ export function AccessibilityPanel() {
         aria-hidden="true"
       />
       <div
-        ref={panelRef}
+        ref={focusTrapRef}
         role="dialog"
         aria-label="Painel de Acessibilidade"
+        aria-modal="true"
         tabIndex={-1}
         className="fixed left-0 top-0 h-full w-80 bg-bg-secondary border-r border-white/10 z-50 overflow-y-auto animate-slide-in-left focus:outline-none"
       >

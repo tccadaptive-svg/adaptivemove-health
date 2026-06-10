@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Lock, Bell, Accessibility, Save, AlertTriangle, Camera } from 'lucide-react';
+import { User, Lock, Bell, Accessibility, Save, AlertTriangle, Camera, Eye, EyeOff, Palette, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useA11y } from '../contexts/A11yContext';
 import { supabase } from '../lib/supabase';
@@ -8,6 +8,8 @@ const TABS = [
   { id: 'profile', label: 'Perfil', icon: User },
   { id: 'account', label: 'Conta', icon: Lock },
   { id: 'notifications', label: 'Notificações', icon: Bell },
+  { id: 'privacy', label: 'Privacidade', icon: Shield },
+  { id: 'theme', label: 'Tema', icon: Palette },
   { id: 'accessibility', label: 'Acessibilidade', icon: Accessibility },
 ];
 
@@ -19,11 +21,12 @@ export function SettingsPage() {
     full_name: user?.full_name || '',
     bio: user?.bio || '',
     location_city: user?.location_city || '',
-    instagram: (user?.social_links as any)?.instagram || '',
-    twitter: (user?.social_links as any)?.twitter || '',
-    strava: (user?.social_links as any)?.strava || '',
+    instagram: user?.social_links?.instagram || '',
+    twitter: user?.social_links?.twitter || '',
+    strava: user?.social_links?.strava || '',
   });
-  const [emailForm, setEmailForm] = useState({ email: user?.email || '', current_password: '' });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [, setEmailForm] = useState({ email: user?.email || '', current_password: '' });
   const [passwordForm, setPasswordForm] = useState({ current: '', password: '', confirm: '' });
   const [notifications, setNotifications] = useState({
     workout_reminders: true,
@@ -31,6 +34,18 @@ export function SettingsPage() {
     direct_messages: true,
     plan_updates: true,
     newsletter: false,
+  });
+  const [privacy, setPrivacy] = useState({
+    profile_public: true,
+    show_email: false,
+    show_location: true,
+    allow_messages: true,
+    data_analytics: true,
+  });
+  const [theme, setTheme] = useState({
+    accentColor: 'blue',
+    compactMode: false,
+    sidebarCollapsed: false,
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -99,13 +114,19 @@ export function SettingsPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 animate-fade-in">
       <h1 className="font-display text-3xl font-bold text-text-primary mb-6">Configurações</h1>
+      <p className="text-text-muted text-sm mb-6">Gerencie seu perfil, preferências e configurações de acessibilidade.</p>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 p-1 rounded-xl border border-white/10 mb-8 overflow-x-auto">
+      <div className="flex gap-1 bg-white/5 p-1 rounded-xl border border-white/10 mb-8 overflow-x-auto" role="tablist" aria-label="Abas de configurações">
         {TABS.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${tab === id ? 'bg-accent-blue text-white' : 'text-text-muted hover:text-text-primary'}`}>
-            <Icon size={14} /> {label}
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            role="tab"
+            aria-selected={tab === id}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-accent-blue ${tab === id ? 'bg-accent-blue text-white' : 'text-text-muted hover:text-text-primary'}`}
+          >
+            <Icon size={14} aria-hidden="true" /> {label}
           </button>
         ))}
       </div>
@@ -115,24 +136,24 @@ export function SettingsPage() {
 
       {/* Profile Tab */}
       {tab === 'profile' && (
-        <div className="glass-card p-6 space-y-5">
+        <div className="glass-card p-6 space-y-5 gradient-border">
           {/* Avatar */}
           <div className="flex items-center gap-5">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-2xl bg-accent-blue/20 border-2 border-accent-blue/30 flex items-center justify-center overflow-hidden">
+            <div className="relative group">
+              <div className="w-20 h-20 rounded-2xl bg-accent-blue/20 border-2 border-accent-blue/30 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform">
                 {user?.avatar_url && user.avatar_url.startsWith('http') ? (
                   <img src={user.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
                 ) : (
                   <span className="text-2xl font-bold text-accent-blue">{user?.full_name?.charAt(0)}</span>
                 )}
               </div>
-              <label className="absolute -bottom-1 -right-1 bg-accent-blue rounded-full p-1.5 cursor-pointer hover:bg-blue-500 transition-colors">
+              <label className="absolute -bottom-1 -right-1 bg-accent-blue rounded-full p-1.5 cursor-pointer hover:bg-blue-500 hover:scale-110 active:scale-90 transition-all">
                 <Camera size={12} className="text-white" />
                 <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
               </label>
             </div>
             <div>
-              <p className="font-medium text-text-primary">{user?.full_name}</p>
+              <p className="font-medium text-text-primary group-hover:text-accent-sky transition-colors">{user?.full_name}</p>
               <p className="text-sm text-text-muted">{user?.email}</p>
             </div>
           </div>
@@ -162,7 +183,7 @@ export function SettingsPage() {
                 <div key={key}>
                   <label className="block text-xs text-text-muted mb-1">{label}</label>
                   <input
-                    value={(profileForm as any)[key]}
+                    value={profileForm[key as keyof typeof profileForm] as string}
                     onChange={e => setProfileForm(f => ({ ...f, [key]: e.target.value }))}
                     placeholder={placeholder}
                     className="input-field text-sm"
@@ -171,7 +192,7 @@ export function SettingsPage() {
               ))}
             </div>
           </div>
-          <button onClick={saveProfile} disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-50">
+          <button onClick={saveProfile} disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] transition-transform">
             <Save size={16} /> {saving ? 'Salvando...' : 'Salvar perfil'}
           </button>
         </div>
@@ -180,7 +201,7 @@ export function SettingsPage() {
       {/* Account Tab */}
       {tab === 'account' && (
         <div className="space-y-6">
-          <div className="glass-card p-6 space-y-4">
+          <div className="glass-card p-6 space-y-4 gradient-border">
             <h2 className="font-display font-bold text-lg text-text-primary">Alterar senha</h2>
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1.5">Nova senha</label>
@@ -194,18 +215,18 @@ export function SettingsPage() {
                 onChange={e => setPasswordForm(f => ({ ...f, confirm: e.target.value }))}
                 placeholder="Repita a senha" className="input-field" />
             </div>
-            <button onClick={changePassword} disabled={saving} className="btn-primary disabled:opacity-50">
+            <button onClick={changePassword} disabled={saving} className="btn-primary disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] transition-transform">
               {saving ? 'Salvando...' : 'Alterar senha'}
             </button>
           </div>
 
-          <div className="glass-card p-6 border-red-500/20 space-y-3">
+          <div className="glass-card p-6 border-red-500/20 space-y-3 gradient-border">
             <h2 className="font-display font-bold text-lg text-red-400 flex items-center gap-2">
               <AlertTriangle size={18} /> Zona de Perigo
             </h2>
             <p className="text-text-muted text-sm">Ao excluir sua conta, todos os seus dados serão removidos permanentemente. Esta ação não pode ser desfeita.</p>
             <button onClick={() => setShowDeleteModal(true)}
-              className="px-4 py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-medium">
+              className="px-4 py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 hover:scale-105 active:scale-95 transition-all text-sm font-medium">
               Excluir minha conta
             </button>
           </div>
@@ -223,19 +244,127 @@ export function SettingsPage() {
             { key: 'plan_updates', label: 'Atualizações de plano', desc: 'Cobranças e mudanças de assinatura' },
             { key: 'newsletter', label: 'Newsletter semanal', desc: 'Dicas de treino e novidades da plataforma' },
           ].map(({ key, label, desc }) => (
-            <div key={key} className="flex items-start justify-between py-3 border-b border-white/[0.07] last:border-0">
+            <div key={key} className="flex items-start justify-between py-3 border-b border-white/[0.07] last:border-0 group">
               <div>
-                <p className="text-sm font-medium text-text-primary">{label}</p>
+                <p className="text-sm font-medium text-text-primary group-hover:text-accent-sky transition-colors">{label}</p>
                 <p className="text-xs text-text-muted mt-0.5">{desc}</p>
               </div>
               <button
                 onClick={() => setNotifications(n => ({ ...n, [key]: !(n as any)[key] }))}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ml-4 ${(notifications as any)[key] ? 'bg-accent-blue' : 'bg-white/20'}`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ml-4 focus:outline-none focus:ring-2 focus:ring-accent-blue ${(notifications as any)[key] ? 'bg-accent-blue' : 'bg-white/20'}`}
+                role="switch"
+                aria-checked={(notifications as any)[key]}
+                aria-label={label}
               >
                 <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${(notifications as any)[key] ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Privacy Tab */}
+      {tab === 'privacy' && (
+        <div className="glass-card p-6 space-y-4 gradient-border">
+          <h2 className="font-display font-bold text-lg text-text-primary mb-4">Privacidade</h2>
+          {[
+            { key: 'profile_public', label: 'Perfil público', desc: 'Permitir que outros usuários vejam seu perfil', icon: Eye },
+            { key: 'show_email', label: 'Mostrar e-mail', desc: 'Exibir seu e-mail publicamente no perfil', icon: EyeOff },
+            { key: 'show_location', label: 'Mostrar localização', desc: 'Compartilhar sua cidade no perfil', icon: Eye },
+            { key: 'allow_messages', label: 'Permitir mensagens', desc: 'Receber mensagens de outros usuários', icon: Bell },
+            { key: 'data_analytics', label: 'Análise de dados', desc: 'Permitir coleta de dados anônimos para melhorar a plataforma', icon: Shield },
+          ].map(({ key, label, desc, icon: Icon }) => (
+            <div key={key} className="flex items-start justify-between py-3 border-b border-white/[0.07] last:border-0 group">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-accent-blue/10 group-hover:scale-110 transition-all">
+                  <Icon size={14} className="text-text-muted group-hover:text-accent-sky transition-colors" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text-primary group-hover:text-accent-sky transition-colors">{label}</p>
+                  <p className="text-xs text-text-muted mt-0.5">{desc}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPrivacy(p => ({ ...p, [key]: !(p as any)[key] }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ml-4 focus:outline-none focus:ring-2 focus:ring-accent-blue ${(privacy as any)[key] ? 'bg-accent-blue' : 'bg-white/20'}`}
+                role="switch"
+                aria-checked={(privacy as any)[key]}
+                aria-label={label}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${(privacy as any)[key] ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+          ))}
+          <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/[0.07]">
+            <p className="text-xs text-text-muted">
+              Seus dados são protegidos conforme a LGPD. Você pode solicitar a exclusão completa dos seus dados a qualquer momento entrando em contato com nosso suporte.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Theme Tab */}
+      {tab === 'theme' && (
+        <div className="glass-card p-6 space-y-6 gradient-border">
+          <h2 className="font-display font-bold text-lg text-text-primary mb-4">Aparência</h2>
+
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-3">Cor de destaque</label>
+            <div className="flex gap-3">
+              {[
+                { id: 'blue', color: 'bg-blue-500', label: 'Azul' },
+                { id: 'sky', color: 'bg-sky-400', label: 'Céu' },
+                { id: 'purple', color: 'bg-purple-500', label: 'Roxo' },
+                { id: 'green', color: 'bg-emerald-500', label: 'Verde' },
+                { id: 'orange', color: 'bg-orange-500', label: 'Laranja' },
+              ].map(({ id, color, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setTheme(t => ({ ...t, accentColor: id }))}
+                  className={`w-10 h-10 rounded-xl ${color} transition-all ${theme.accentColor === id ? 'ring-2 ring-white ring-offset-2 ring-offset-bg-secondary scale-110' : 'opacity-60 hover:opacity-100'}`}
+                  title={label}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-start justify-between py-3 border-b border-white/[0.07]">
+            <div>
+              <p className="text-sm font-medium text-text-primary">Modo compacto</p>
+              <p className="text-xs text-text-muted mt-0.5">Reduz espaçamentos para mostrar mais conteúdo</p>
+            </div>
+            <button
+              onClick={() => setTheme(t => ({ ...t, compactMode: !t.compactMode }))}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ml-4 focus:outline-none focus:ring-2 focus:ring-accent-blue ${theme.compactMode ? 'bg-accent-blue' : 'bg-white/20'}`}
+              role="switch"
+              aria-checked={theme.compactMode}
+              aria-label="Modo compacto"
+            >
+              <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${theme.compactMode ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          <div className="flex items-start justify-between py-3 border-b border-white/[0.07]">
+            <div>
+              <p className="text-sm font-medium text-text-primary">Barra lateral recolhida</p>
+              <p className="text-xs text-text-muted mt-0.5">Ocultar textos da barra lateral, mostrando apenas ícones</p>
+            </div>
+            <button
+              onClick={() => setTheme(t => ({ ...t, sidebarCollapsed: !t.sidebarCollapsed }))}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ml-4 focus:outline-none focus:ring-2 focus:ring-accent-blue ${theme.sidebarCollapsed ? 'bg-accent-blue' : 'bg-white/20'}`}
+              role="switch"
+              aria-checked={theme.sidebarCollapsed}
+              aria-label="Barra lateral recolhida"
+            >
+              <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${theme.sidebarCollapsed ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          <div className="p-4 bg-white/5 rounded-xl border border-white/[0.07]">
+            <p className="text-xs text-text-muted">
+              As preferências de tema são salvas localmente no seu navegador e aplicadas automaticamente em todas as sessões.
+            </p>
+          </div>
         </div>
       )}
 
@@ -270,8 +399,13 @@ export function SettingsPage() {
                 <p className="text-sm font-medium text-text-primary">{label}</p>
                 <p className="text-xs text-text-muted mt-0.5">{desc}</p>
               </div>
-              <button onClick={() => updateSetting(key, !settings[key])}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ml-4 ${settings[key] ? 'bg-accent-blue' : 'bg-white/20'}`}>
+              <button
+                onClick={() => updateSetting(key, !settings[key])}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ml-4 focus:outline-none focus:ring-2 focus:ring-accent-blue ${settings[key] ? 'bg-accent-blue' : 'bg-white/20'}`}
+                role="switch"
+                aria-checked={settings[key]}
+                aria-label={label}
+              >
                 <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings[key] ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>

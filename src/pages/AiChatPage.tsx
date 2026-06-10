@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Send, Trash2, Bot, Sparkles, AlertCircle } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Send, Trash2, Sparkles, AlertCircle, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,25 +20,40 @@ export function AiChatPage() {
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const loadMessages = useCallback(async () => {
     if (!user) return;
-    supabase.from('ai_chat_messages')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at')
-      .then(({ data }) => setMessages(data || []));
+    setError(null);
+    try {
+      const { data, error } = await supabase.from('ai_chat_messages')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at');
+      if (error) throw error;
+      setMessages(data || []);
+    } catch {
+      setError('Não foi possível carregar o histórico. Tente novamente.');
+    } finally {
+      setInitialLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  async function sendMessage(text?: string) {
+  const sendMessage = useCallback(async (text?: string) => {
     const content = text || input.trim();
     if (!content || loading || !user) return;
     setInput('');
+    setError(null);
 
     const userMsg: AiChatMessage = {
       id: crypto.randomUUID(),
@@ -48,17 +63,22 @@ export function AiChatPage() {
       created_at: new Date().toISOString(),
     };
 
-    await supabase.from('ai_chat_messages').insert({ user_id: user.id, role: 'user', content });
+    const { error: insertError } = await supabase.from('ai_chat_messages').insert({ user_id: user.id, role: 'user', content });
+    if (insertError) {
+      setError('Erro ao enviar mensagem. Tente novamente.');
+      return;
+    }
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
     try {
-      // Use mock AI response (simulates real API with delay)
       const delay = generateLoadingDelay();
       await new Promise(resolve => setTimeout(resolve, delay));
       const reply = getMockAiResponse(content);
 
-      await supabase.from('ai_chat_messages').insert({ user_id: user.id, role: 'assistant', content: reply });
+      const { error: replyError } = await supabase.from('ai_chat_messages').insert({ user_id: user.id, role: 'assistant', content: reply });
+      if (replyError) throw replyError;
+
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         user_id: user.id,
@@ -67,21 +87,52 @@ export function AiChatPage() {
         created_at: new Date().toISOString(),
       }]);
     } catch {
-      setMessages(prev => [...prev, {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        role: 'assistant',
-        content: 'Desculpe, não consegui processar sua mensagem. Tente novamente.',
-        created_at: new Date().toISOString(),
-      }]);
+      setError('Erro ao processar resposta. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  }, [input, loading, user]);
+
+  const clearChat = useCallback(async () => {
+    if (!user || !confirm('Limpar todo o histórico desta conversa?')) return;
+    try {
+      const { error } = await supabase.from('ai_chat_messages').delete().eq('user_id', user.id);
+      if (error) throw error;
+      setMessages([]);
+    } catch {
+      setError('Erro ao limpar histórico.');
+    }
+  }, [user]);
+
+  if (initialLoading) {
+    return (
+      <div className="flex flex-col h-screen" role="status" aria-label="Carregando chat">
+        <div className="flex items-center justify-center flex-1">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 size={32} className="text-accent-blue animate-spin" />
+            <p className="text-text-muted text-sm">Carregando conversa...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  async function clearChat() {
-    if (!user || !confirm('Limpar todo o histórico desta conversa?')) return;
-    await supabase.from('ai_chat_messages').delete().eq('user_id', user.id);
-    setMessages([]);
+  if (error && messages.length === 0) {
+    return (
+      <div className="flex flex-col h-screen">
+        <div className="flex items-center justify-center flex-1">
+          <div className="text-center max-w-md px-4">
+            <AlertTriangle size={48} className="text-warning mx-auto mb-4" aria-hidden="true" />
+            <h2 className="font-display text-xl font-bold text-text-primary mb-2">Erro ao carregar</h2>
+            <p className="text-text-muted text-sm mb-6">{error}</p>
+            <button onClick={loadMessages} className="btn-primary inline-flex items-center gap-2">
+              <RefreshCw size={16} aria-hidden="true" />
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -89,30 +140,39 @@ export function AiChatPage() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.07] bg-bg-secondary">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-accent-blue/20 rounded-xl flex items-center justify-center animate-pulse-glow">
+          <div className="w-10 h-10 bg-accent-blue/20 rounded-xl flex items-center justify-center">
             <LighthouseIcon size={24} />
           </div>
           <div>
             <h1 className="font-display font-bold text-text-primary">Assistente AdaptiveMove</h1>
-            <p className="text-xs text-success flex items-center gap-1"><span className="w-1.5 h-1.5 bg-success rounded-full" />Online</p>
+            <p className="text-xs text-success flex items-center gap-1"><span className="w-1.5 h-1.5 bg-success rounded-full" aria-hidden="true" />Online</p>
           </div>
         </div>
         {messages.length > 0 && (
-          <button onClick={clearChat} className="btn-ghost text-sm flex items-center gap-1.5 text-text-muted hover:text-red-400">
-            <Trash2 size={14} /> Limpar
+          <button onClick={clearChat} className="btn-ghost text-sm flex items-center gap-1.5 text-text-muted hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-accent-blue">
+            <Trash2 size={14} aria-hidden="true" /> Limpar
           </button>
         )}
       </div>
 
       {/* Demo info banner */}
-      <div className="px-4 py-2 bg-accent-sky/10 border-b border-accent-sky/20 flex items-start gap-2">
-        <AlertCircle size={14} className="text-accent-sky mt-0.5 flex-shrink-0" />
+      <div className="px-4 py-2 bg-accent-sky/10 border-b border-accent-sky/20 flex items-start gap-2" role="note" aria-label="Informação sobre modo demonstração">
+        <AlertCircle size={14} className="text-accent-sky mt-0.5 flex-shrink-0" aria-hidden="true" />
         <p className="text-xs text-accent-sky"><strong>Modo Demo:</strong> Respostas simuladas. Em produção com ANTHROPIC_API_KEY configurado, usará Claude real.</p>
       </div>
 
+      {/* Error banner */}
+      {error && messages.length > 0 && (
+        <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 flex items-center gap-2" role="alert">
+          <AlertTriangle size={14} className="text-red-400 flex-shrink-0" aria-hidden="true" />
+          <p className="text-xs text-red-400 flex-1">{error}</p>
+          <button onClick={() => setError(null)} className="text-xs text-red-400 hover:underline">Fechar</button>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {messages.length === 0 && (
+        {messages.length === 0 && !loading && (
           <div className="flex flex-col items-center justify-center h-full text-center py-12 space-y-6">
             <div className="w-20 h-20 bg-accent-blue/10 rounded-2xl flex items-center justify-center">
               <LighthouseIcon size={48} />
@@ -126,9 +186,9 @@ export function AiChatPage() {
                 <button
                   key={p}
                   onClick={() => sendMessage(p)}
-                  className="glass-card p-3 text-sm text-left text-text-muted hover:text-text-primary transition-colors flex items-start gap-2"
+                  className="glass-card p-3 text-sm text-left text-text-muted hover:text-text-primary hover:scale-[1.02] active:scale-[0.98] hover:border-accent-sky/30 transition-all flex items-start gap-2 focus:outline-none focus:ring-2 focus:ring-accent-blue gradient-border"
                 >
-                  <Sparkles size={14} className="text-accent-sky mt-0.5 flex-shrink-0" />
+                  <Sparkles size={14} className="text-accent-sky mt-0.5 flex-shrink-0 group-hover:scale-110 transition-transform" aria-hidden="true" />
                   {p}
                 </button>
               ))}
@@ -139,7 +199,7 @@ export function AiChatPage() {
         {messages.map(msg => (
           <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} animate-fade-in`}>
             {msg.role === 'assistant' && (
-              <div className="w-8 h-8 bg-accent-blue/20 rounded-xl flex items-center justify-center flex-shrink-0 mt-1">
+              <div className="w-8 h-8 bg-accent-blue/20 rounded-xl flex items-center justify-center flex-shrink-0 mt-1" aria-hidden="true">
                 <LighthouseIcon size={20} />
               </div>
             )}
@@ -149,12 +209,17 @@ export function AiChatPage() {
                   ? 'bg-accent-blue text-white rounded-tr-sm'
                   : 'bg-bg-card text-text-primary border border-white/[0.07] rounded-tl-sm'
               }`}
+              aria-label={`${msg.role === 'user' ? 'Você' : 'Assistente'}: ${msg.content.replace(/[#*`]/g, '').slice(0, 50)}...`}
             >
               {msg.role === 'assistant' ? (
-                <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-invert prose-sm max-w-none">
-                  {msg.content}
-                </ReactMarkdown>
-              ) : msg.content}
+                <div className="prose prose-invert prose-sm max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <p>{msg.content}</p>
+              )}
               <div className={`text-[10px] mt-1.5 ${msg.role === 'user' ? 'text-blue-200' : 'text-text-muted'}`}>
                 {new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
               </div>
@@ -163,14 +228,14 @@ export function AiChatPage() {
         ))}
 
         {loading && (
-          <div className="flex gap-3 animate-fade-in">
-            <div className="w-8 h-8 bg-accent-blue/20 rounded-xl flex items-center justify-center flex-shrink-0 mt-1">
+          <div className="flex gap-3 animate-fade-in" aria-label="Assistente está digitando">
+            <div className="w-8 h-8 bg-accent-blue/20 rounded-xl flex items-center justify-center flex-shrink-0 mt-1" aria-hidden="true">
               <LighthouseIcon size={20} />
             </div>
             <div className="bg-bg-card border border-white/[0.07] rounded-2xl rounded-tl-sm px-5 py-4">
               <div className="flex gap-1.5 items-center">
                 {[0, 1, 2].map(i => (
-                  <span key={i} className="w-2 h-2 bg-accent-sky rounded-full animate-typing" style={{ animationDelay: `${i * 0.2}s` }} />
+                  <span key={i} className="w-2 h-2 bg-accent-sky rounded-full animate-typing" style={{ animationDelay: `${i * 0.2}s` }} aria-hidden="true" />
                 ))}
               </div>
             </div>
@@ -186,23 +251,28 @@ export function AiChatPage() {
           onSubmit={e => { e.preventDefault(); sendMessage(); }}
           className="flex gap-3 items-end max-w-4xl mx-auto"
         >
+          <label htmlFor="ai-chat-input" className="sr-only">Mensagem</label>
           <textarea
+            id="ai-chat-input"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
             placeholder="Digite sua mensagem... (Enter para enviar)"
             className="input-field flex-1 resize-none min-h-[44px] max-h-32 py-3"
             rows={1}
+            disabled={loading}
+            aria-describedby="ai-chat-hint"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="btn-primary w-11 h-11 flex items-center justify-center flex-shrink-0 disabled:opacity-50"
+            className="btn-primary w-11 h-11 flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-accent-blue"
+            aria-label="Enviar mensagem"
           >
-            <Send size={18} />
+            <Send size={18} aria-hidden="true" />
           </button>
         </form>
-        <p className="text-center text-[10px] text-text-muted mt-2">
+        <p id="ai-chat-hint" className="text-center text-[10px] text-text-muted mt-2">
           Não substitui consulta médica profissional.
         </p>
       </div>

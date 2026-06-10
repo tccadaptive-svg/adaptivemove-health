@@ -344,20 +344,58 @@ CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
   free_plan_id uuid;
+  user_email text;
+  user_full_name text;
 BEGIN
+  -- Buscar plano Free; se não existir, usar NULL (permitido pela FK)
   SELECT id INTO free_plan_id FROM plans WHERE name = 'Free' LIMIT 1;
-  INSERT INTO users (id, email, full_name, avatar_url, plan_id)
+
+  -- Tratar email: se NULL ou vazio, usar fallback único
+  user_email := NULLIF(TRIM(COALESCE(NEW.email, '')), '');
+  IF user_email IS NULL OR user_email = '' THEN
+    user_email := 'user_' || NEW.id::text || '@temp.local';
+  END IF;
+
+  -- Tratar nome completo
+  user_full_name := NULLIF(TRIM(COALESCE(NEW.raw_user_meta_data->>'full_name', '')), '');
+  IF user_full_name IS NULL OR user_full_name = '' THEN
+    user_full_name := split_part(COALESCE(NEW.email, user_email), '@', 1);
+  END IF;
+
+  INSERT INTO users (id, email, full_name, avatar_url, plan_id, role, social_links, accessibility_settings)
   VALUES (
     NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
-    NEW.raw_user_meta_data->>'avatar_url',
-    free_plan_id
+    user_email,
+    user_full_name,
+    NULLIF(TRIM(COALESCE(NEW.raw_user_meta_data->>'avatar_url', '')), ''),
+    free_plan_id,
+    'user',
+    '{"instagram": "", "twitter": "", "strava": ""}'::jsonb,
+    '{"fontSize": "normal", "highContrast": false, "reduceMotion": false, "textSpacing": false, "enhancedFocus": false, "colorBlindness": "none", "largeCursor": false}'::jsonb
   )
   ON CONFLICT (id) DO NOTHING;
+
+  -- Se falhou por causa de email duplicado ou outro erro, não bloquear o cadastro
+  -- O usuário já existe em auth.users, então o cadastro no frontend vai funcionar
   RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Log do erro mas não falha o cadastro
+    RAISE WARNING 'Erro ao criar perfil do usuário: %', SQLERRM;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Garantir que o plano Free existe (seed idempotente)
+INSERT INTO plans (name, price_monthly, price_yearly, features, is_featured)
+VALUES (
+  'Free',
+  0,
+  0,
+  '["Acesso ao mapa de academias", "5 treinos/mês no calendário", "Chat IA limitado (10 msg/dia)", "Feed social", "Perfil público"]'::jsonb,
+  false
+)
+ON CONFLICT (name) DO NOTHING;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created

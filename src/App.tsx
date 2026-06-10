@@ -1,7 +1,8 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { A11yProvider } from './contexts/A11yContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -15,6 +16,8 @@ import { FeedPage } from './pages/FeedPage';
 import { PlansPage } from './pages/PlansPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AdminPage } from './pages/AdminPage';
+import { SkipToMainContent } from './components/ui/SkipToMainContent';
+import { ScreenReaderAnnouncer } from './components/ui/ScreenReaderAnnouncer';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -30,26 +33,47 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PageTransition({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const [displayChildren, setDisplayChildren] = useState(children);
+  const [transitionStage, setTransitionStage] = useState('page-enter');
+
+  useEffect(() => {
+    setTransitionStage('page-enter');
+    const timeout = setTimeout(() => {
+      setDisplayChildren(children);
+      setTransitionStage('page-enter-active');
+    }, 50);
+    return () => clearTimeout(timeout);
+  }, [location.pathname]);
+
+  return (
+    <div className={`${transitionStage} ${transitionStage === 'page-enter-active' ? 'page-enter-active' : ''}`}>
+      {displayChildren}
+    </div>
+  );
+}
+
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
+      <Route path="/register" element={<PageTransition><RegisterPage /></PageTransition>} />
+      <Route path="/forgot-password" element={<PageTransition><ForgotPasswordPage /></PageTransition>} />
       <Route path="/" element={
         <ProtectedRoute>
           <AppLayout />
         </ProtectedRoute>
       }>
-        <Route index element={<DashboardPage />} />
-        <Route path="map" element={<MapPage />} />
-        <Route path="calendar" element={<CalendarPage />} />
-        <Route path="ai-chat" element={<AiChatPage />} />
-        <Route path="messages" element={<MessagesPage />} />
-        <Route path="feed" element={<FeedPage />} />
-        <Route path="plans" element={<PlansPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="admin" element={<AdminPage />} />
+        <Route index element={<PageTransition><DashboardPage /></PageTransition>} />
+        <Route path="map" element={<PageTransition><MapPage /></PageTransition>} />
+        <Route path="calendar" element={<PageTransition><CalendarPage /></PageTransition>} />
+        <Route path="ai-chat" element={<PageTransition><AiChatPage /></PageTransition>} />
+        <Route path="messages" element={<PageTransition><MessagesPage /></PageTransition>} />
+        <Route path="feed" element={<PageTransition><FeedPage /></PageTransition>} />
+        <Route path="plans" element={<PageTransition><PlansPage /></PageTransition>} />
+        <Route path="settings" element={<PageTransition><SettingsPage /></PageTransition>} />
+        <Route path="admin" element={<PageTransition><AdminPage /></PageTransition>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -61,7 +85,11 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <A11yProvider>
-          <AppRoutes />
+          <ToastProvider>
+            <SkipToMainContent />
+            <AppRoutes />
+            <ScreenReaderAnnouncer message="Página carregada" />
+          </ToastProvider>
         </A11yProvider>
       </AuthProvider>
     </BrowserRouter>

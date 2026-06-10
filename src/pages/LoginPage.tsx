@@ -3,35 +3,51 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { LighthouseIcon } from '../components/ui/LighthouseIcon';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 export function LoginPage() {
   const { signIn, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [touched, setTouched] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) { setError('Preencha todos os campos.'); return; }
+    setTouched(true);
+    if (!email || !password) {
+      setError('Preencha todos os campos.');
+      return;
+    }
     setLoading(true);
     setError('');
     const { error: err } = await signIn(email, password);
     setLoading(false);
     if (err) {
-      setError('Email ou senha inválidos. Tente novamente.');
+      const msg = typeof err === 'string' ? err : 'Email ou senha inválidos. Tente novamente.';
+      setError(msg);
+      addToast(msg, 'error');
     } else {
+      addToast('Login realizado com sucesso!', 'success');
       navigate('/');
     }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    await signInWithGoogle();
+    setLoading(false);
   };
 
   return (
     <div className="min-h-screen flex bg-bg-primary">
       {/* Left panel */}
-      <div className="hidden lg:flex flex-col justify-between w-1/2 animated-bg p-12 relative overflow-hidden">
+      <div className="hidden lg:flex flex-col justify-between w-1/2 animated-bg p-12 relative overflow-hidden gradient-border">
         <div className="absolute inset-0 bg-gradient-to-br from-accent-blue/20 via-transparent to-accent-sky/10 pointer-events-none" />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-12">
@@ -48,6 +64,20 @@ export function LoginPage() {
             <p className="text-text-muted text-lg leading-relaxed">
               Uma plataforma inclusiva para todos os corpos, todas as capacidades. Encontre academias, agende treinos e conecte-se com sua comunidade.
             </p>
+            <div className="flex gap-6 pt-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-text-primary">500+</div>
+                <div className="text-text-muted text-sm">Academias</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-text-primary">10k+</div>
+                <div className="text-text-muted text-sm">Usuários</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-text-primary">50+</div>
+                <div className="text-text-muted text-sm">Cidades</div>
+              </div>
+            </div>
           </div>
         </div>
         <div className="relative z-10">
@@ -70,48 +100,57 @@ export function LoginPage() {
           <h2 className="font-display text-3xl font-bold text-text-primary mb-2">Entrar</h2>
           <p className="text-text-muted mb-8">Bem-vindo de volta! Acesse sua conta.</p>
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm">
+          {error && touched && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm animate-fade-in" role="alert">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Email</label>
+              <label htmlFor="login-email" className="block text-sm font-medium text-text-primary mb-1.5">Email</label>
               <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" />
                 <input
+                  id="login-email"
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="seu@email.com"
-                  className="input-field pl-10"
+                  className={`input-field pl-10 ${touched && !email ? 'border-red-500/50 focus:border-red-500' : ''}`}
                   autoComplete="email"
+                  aria-invalid={touched && !email}
+                  aria-describedby={touched && !email ? 'email-error' : undefined}
                 />
               </div>
+              {touched && !email && <p id="email-error" className="text-red-400 text-xs mt-1">Email é obrigatório</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Senha</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-text-primary mb-1.5">Senha</label>
               <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" />
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="input-field pl-10 pr-10"
+                  className={`input-field pl-10 pr-10 ${touched && !password ? 'border-red-500/50 focus:border-red-500' : ''}`}
                   autoComplete="current-password"
+                  aria-invalid={touched && !password}
+                  aria-describedby={touched && !password ? 'password-error' : undefined}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {touched && !password && <p id="password-error" className="text-red-400 text-xs mt-1">Senha é obrigatória</p>}
             </div>
 
             <div className="flex items-center justify-between">
@@ -132,8 +171,9 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full py-3 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary w-full py-3 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
+              {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />}
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
@@ -148,10 +188,11 @@ export function LoginPage() {
           </div>
 
           <button
-            onClick={signInWithGoogle}
-            className="w-full flex items-center justify-center gap-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg py-3 text-text-primary font-medium transition-all"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg py-3 text-text-primary font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
               <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
               <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>

@@ -38,6 +38,7 @@ export interface Database {
           accessibility_settings: AccessibilitySettings
           created_at: string
           updated_at: string
+          plans?: { id: string; name: string } | null
         }
         Insert: Omit<Database['public']['Tables']['users']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['users']['Insert']>

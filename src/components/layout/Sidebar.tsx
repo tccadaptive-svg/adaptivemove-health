@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, MapPin, Calendar, Bot, MessageSquare,
@@ -37,11 +37,13 @@ export function Sidebar() {
       } flex-shrink-0 relative`}
     >
       {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 py-5 border-b border-white/[0.07] ${collapsed ? 'justify-center' : ''}`}>
-        <LighthouseIcon size={32} />
+      <div className={`group flex items-center gap-3 px-4 py-5 border-b border-white/[0.07] ${collapsed ? 'justify-center' : ''}`}>
+        <div className="w-10 h-10 rounded-xl bg-accent-blue/10 flex items-center justify-center border border-accent-blue/20 group-hover:scale-110 transition-transform">
+          <LighthouseIcon size={24} />
+        </div>
         {!collapsed && (
           <div>
-            <h1 className="font-display font-bold text-lg text-text-primary leading-none">AdaptiveMove</h1>
+            <h1 className="font-display font-bold text-lg text-text-primary leading-none group-hover:text-accent-sky transition-colors">AdaptiveMove</h1>
             <p className="text-[10px] text-text-muted mt-0.5 leading-tight">Movimento para todos. Saúde para o mundo.</p>
           </div>
         )}
@@ -50,26 +52,26 @@ export function Sidebar() {
       {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-6 bg-bg-card border border-white/10 rounded-full p-0.5 text-text-muted hover:text-text-primary transition-colors z-10"
+        className="absolute -right-3 top-6 bg-bg-card border border-white/10 rounded-full p-0.5 text-text-muted hover:text-text-primary hover:scale-110 active:scale-90 transition-all z-10"
         aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
       >
         {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto" aria-label="Menu principal">
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `nav-item ${isActive ? 'active' : ''} ${collapsed ? 'justify-center px-2' : ''}`
+              `nav-item ${isActive ? 'active' : ''} ${collapsed ? 'justify-center px-2' : ''} group`
             }
             title={collapsed ? label : undefined}
           >
-            <Icon size={18} className="flex-shrink-0" />
-            {!collapsed && <span className="truncate">{label}</span>}
+            <Icon size={18} className="flex-shrink-0 group-hover:scale-110 transition-transform" aria-hidden="true" />
+            {!collapsed && <span className="truncate group-hover:text-accent-sky transition-colors">{label}</span>}
           </NavLink>
         ))}
 
